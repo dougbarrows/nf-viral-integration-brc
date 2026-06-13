@@ -49,7 +49,7 @@ process ASSIGN_CLONAL_IDS {
 
 process CIRCOS_SAMPLE {
     tag        { sample_id }
-    publishDir "${params.outdir}/04_final_results/${sample_id}/circos", mode: 'copy'
+    publishDir { "${params.outdir}/04_final_results/${sample_id}/circos" }, mode: 'copy'
 
     input:
     tuple val(sample_id), path(integrations_tsv)
@@ -95,7 +95,7 @@ process CIRCOS_PROJECT {
 
 process SAMPLE_HTML {
     tag        { sample_id }
-    publishDir "${params.outdir}/04_final_results/${sample_id}/report", mode: 'copy'
+    publishDir { "${params.outdir}/04_final_results/${sample_id}/report" }, mode: 'copy'
 
     input:
     tuple val(sample_id), path(integrations_tsv), path(circos_png)
@@ -164,7 +164,7 @@ workflow POST_PROCESS {
         all_integrations_ch = integrations_per_sample
             .map { sid, tsv -> tsv }
             .collectFile(name: 'all_samples.integrations.tsv',
-                         keepHeader: true, skip: 1)
+                         keepHeader: true, skip: 1, sort: false)
 
         // 2. RepeatMasker download (T2T + HG38) — cached by REPEATMASKER_DOWNLOAD.
         rmsk_inputs = Channel.of(tuple('t2t',  params.repeatmasker_url_t2t))

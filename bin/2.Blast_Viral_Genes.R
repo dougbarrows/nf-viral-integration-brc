@@ -84,7 +84,6 @@ PREFIX <- parse_arg("--prefix", args, default = "")
 if (!is.null(PREFIX) && nchar(PREFIX) > 0) {
   PREFIX <- str_remove(PREFIX, "/$")
   DB_BASE <- file.path(PREFIX, DB_BASE)
-  TMPDIR <- file.path(PREFIX, TMPDIR)
   IPDA_BLASTDB <- file.path(PREFIX, IPDA_BLASTDB)
   IPDA_V2_BLASTDB <- file.path(PREFIX, IPDA_V2_BLASTDB)
 }

@@ -120,10 +120,6 @@ def helpMessage() {
     """.stripIndent()
 }
 
-if (params.help) {
-    helpMessage()
-    exit 0
-}
 
 // ========================================================================================
 // INPUT VALIDATION
@@ -164,33 +160,6 @@ def validateInputs() {
     }
 }
 
-validateInputs()
-
-// ========================================================================================
-// PRINT PARAMETER SUMMARY
-// ========================================================================================
-
-log.info ""
-log.info "========================================================================================"
-log.info "HIV SMRTCap INTEGRATION DETECTION PIPELINE"
-log.info "========================================================================================"
-log.info "Host genome       : ${params.host_genome}"
-log.info "Viral genomes     : ${params.viral_genomes ?: params.viral_genome}"
-log.info "Host annotation   : ${params.annotation}"
-log.info "Min MAPQ          : ${params.min_mapq}"
-log.info "Max iterations    : ${params.max_iterations}"
-log.info "Demultiplex (lima): ${params.skip_demux ? 'SKIPPED' : 'enabled (per-row demux flag)'}"
-log.info "Clonal window     : ±${params.clonal_window_bp} bp"
-log.info "Report genome     : ${params.report_genome}"
-log.info "HTML mode         : ${params.html_mode}"
-log.info "Output directory  : ${params.outdir}"
-if (!params.patient_dir && !params.patient_bam && !params.patient_fastq && !params.samples) {
-    log.info "Mode              : SIMULATION"
-    log.info "Integrations      : ${params.n_integrations}"
-    log.info "Depth             : ${params.depth}x"
-}
-log.info "========================================================================================"
-log.info ""
 
 // ========================================================================================
 //  PROCESSES (existing — unchanged from main_2.nf)
@@ -295,7 +264,7 @@ process TRIM_READS {
 // Map reads to each viral reference genome (competitive mapping)
 process MULTI_REFERENCE_MAPPING {
     tag "${sample_id}_vs_${viral_genome.baseName}"
-    publishDir "${params.outdir}/01_reference_selection/${sample_id}", mode: 'link'
+    publishDir { "${params.outdir}/01_reference_selection/${sample_id}" }, mode: 'link'
     container params.container
 
     input:
@@ -343,7 +312,7 @@ process MULTI_REFERENCE_MAPPING {
 // Select best viral reference based on alignment metrics
 process SELECT_BEST_REFERENCE {
     tag "${sample_id}"
-    publishDir "${params.outdir}/01_reference_selection/${sample_id}", mode: 'link'
+    publishDir { "${params.outdir}/01_reference_selection/${sample_id}" }, mode: 'link'
     container params.container
 
     input:
@@ -379,7 +348,7 @@ process SELECT_BEST_REFERENCE {
 // Iterative viral mapping - loops until no viral reads remain
 process ITERATIVE_MAPPING {
     tag "${sample_id}"
-    publishDir "${params.outdir}/02_iterative_masking/${sample_id}", mode: 'link'
+    publishDir { "${params.outdir}/02_iterative_masking/${sample_id}" }, mode: 'link'
     container params.container
 
     input:
@@ -499,6 +468,35 @@ include { CREATE_HTML_REPORT } from './bin/integration_annotation.nf'
 // WORKFLOW
 // ========================================================================================
 workflow {
+
+    if (params.help) {
+        helpMessage()
+        exit 0
+    }
+
+    validateInputs()
+
+    log.info ""
+    log.info "========================================================================================"
+    log.info "HIV SMRTCap INTEGRATION DETECTION PIPELINE"
+    log.info "========================================================================================"
+    log.info "Host genome       : ${params.host_genome}"
+    log.info "Viral genomes     : ${params.viral_genomes ?: params.viral_genome}"
+    log.info "Host annotation   : ${params.annotation}"
+    log.info "Min MAPQ          : ${params.min_mapq}"
+    log.info "Max iterations    : ${params.max_iterations}"
+    log.info "Demultiplex (lima): ${params.skip_demux ? 'SKIPPED' : 'enabled (per-row demux flag)'}"
+    log.info "Clonal window     : ±${params.clonal_window_bp} bp"
+    log.info "Report genome     : ${params.report_genome}"
+    log.info "HTML mode         : ${params.html_mode}"
+    log.info "Output directory  : ${params.outdir}"
+    if (!params.patient_dir && !params.patient_bam && !params.patient_fastq && !params.samples) {
+        log.info "Mode              : SIMULATION"
+        log.info "Integrations      : ${params.n_integrations}"
+        log.info "Depth             : ${params.depth}x"
+    }
+    log.info "========================================================================================"
+    log.info ""
 
     // ==================================================================================
     // SETUP
@@ -722,19 +720,18 @@ workflow {
         .mix(MULTI_REFERENCE_MAPPING.out.results.map { it[3] })
         .mix(QUALIMAP.out.results)
         .collect())
-}
 
-// ========================================================================================
-// COMPLETION
-// ========================================================================================
-workflow.onComplete {
+    // ========================================================================================
+    // COMPLETION
+    // ========================================================================================
+    workflow.onComplete {
     log.info ""
     log.info "========================================================================================"
     log.info "VIRAL INTEGRATION PIPELINE COMPLETE"
     log.info "========================================================================================"
-    log.info "Status:           ${workflow.success ? 'SUCCESS' : 'FAILED'}"
-    log.info "Duration:         ${workflow.duration}"
-    log.info "Output directory: ${params.outdir}"
+    log.info "Status:           ${workflow?.success == true ? 'SUCCESS' : workflow?.success == false ? 'FAILED' : 'COMPLETE'}"
+    log.info "Duration:         ${workflow?.duration ?: '(see log footer)'}"
+    log.info "Output directory: ${params?.outdir ?: '(see nextflow config)'}"
     log.info ""
     log.info "Key Results:"
     log.info "  01_reference_selection/   - Best viral reference & initial mapping"
@@ -749,12 +746,13 @@ workflow.onComplete {
     log.info "  project/report/           - Project rollup HTML (single + multi-page)"
     log.info ""
     log.info "Integration Sites:"
-    log.info "  ${params.outdir}/04_final_results/*integration_sites.txt"
-    log.info "  ${params.outdir}/04_final_results/*integration_summary.txt"
-    log.info "  ${params.outdir}/clonal_tracking/integrations_with_clonal_id.tsv"
-    log.info "  ${params.outdir}/clonal_tracking/clonal_persistence_wide.tsv"
+    log.info "  ${params?.outdir}/04_final_results/*integration_sites.txt"
+    log.info "  ${params?.outdir}/04_final_results/*integration_summary.txt"
+    log.info "  ${params?.outdir}/clonal_tracking/integrations_with_clonal_id.tsv"
+    log.info "  ${params?.outdir}/clonal_tracking/clonal_persistence_wide.tsv"
     log.info ""
     log.info "Iteration Logs:"
-    log.info "  ${params.outdir}/02_iterative_masking/*_iteration_log.txt"
+    log.info "  ${params?.outdir}/02_iterative_masking/*_iteration_log.txt"
     log.info "========================================================================================"
+    }
 }

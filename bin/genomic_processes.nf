@@ -70,7 +70,7 @@ process UNMASK_SEQUENCES {
 // Extract flanking sequences
 process EXTRACT_FLANKS {
     tag "${sample_id}"
-    publishDir "${params.outdir}/03_flank_host_mapping/${sample_id}", mode: 'copy'
+    publishDir { "${params.outdir}/03_flank_host_mapping/${sample_id}" }, mode: 'copy'
 
     container params.container
 
@@ -92,7 +92,7 @@ process EXTRACT_FLANKS {
 // Map flanks to host genome
 process MAP_FLANKS_TO_HOST {
     tag "${sample_id}"
-    publishDir "${params.outdir}/03_flank_host_mapping/${sample_id}", mode: 'copy'
+    publishDir { "${params.outdir}/03_flank_host_mapping/${sample_id}" }, mode: 'copy'
     container params.container
 
     input:
@@ -133,7 +133,7 @@ process MAP_FLANKS_TO_HOST {
 // Confirm alignments by mapping original reads to host
 process CONFIRM_HOST_ALIGNMENTS {
     tag "${sample_id}"
-    publishDir "${params.outdir}/03_flank_host_mapping/${sample_id}", mode: 'copy'
+    publishDir { "${params.outdir}/03_flank_host_mapping/${sample_id}" }, mode: 'copy'
     container params.container
 
     input:
@@ -188,7 +188,7 @@ process CONFIRM_HOST_ALIGNMENTS {
 // Combine HIV integration results
 process COMBINE_RESULTS {
     tag "${sample_id}"
-    publishDir "${params.outdir}/04_final_results/${sample_id}/annotations", mode: 'copy'
+    publishDir { "${params.outdir}/04_final_results/${sample_id}/annotations" }, mode: 'copy'
     container params.container
 
     input:

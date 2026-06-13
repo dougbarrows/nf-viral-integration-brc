@@ -179,8 +179,9 @@ summary_card <- function(dt) {
               paste(sort(unique(stats::na.omit(dt$timepoint))), collapse = ", ") else "n/a"
   clones <- if ("clonal_id" %in% colnames(dt))
               length(unique(stats::na.omit(dt$clonal_id))) else NA_integer_
-  in_rep <- if ("in_repeat_t2t" %in% colnames(dt))
-              sum(as.logical(dt$in_repeat_t2t), na.rm = TRUE) else NA_integer_
+  repeat_col <- if ("in_repeat_t2t" %in% colnames(dt)) "in_repeat_t2t" else
+                if ("in_repeat"     %in% colnames(dt)) "in_repeat"     else NULL
+  in_rep <- if (!is.null(repeat_col)) sum(as.logical(dt[[repeat_col]]), na.rm = TRUE) else NA_integer_
   chr_n  <- if ("chrom" %in% colnames(dt))
               length(unique(stats::na.omit(dt$chrom))) else NA_integer_
   paste0(

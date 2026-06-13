@@ -46,7 +46,7 @@ process REPEATMASKER_DOWNLOAD {
 
 process REPEATMASKER_OVERLAP {
     tag        { "${sample_id}:${genome_label}" }
-    publishDir "${params.outdir}/${sample_id}/repeats", mode: 'copy'
+    publishDir { "${params.outdir}/${sample_id}/repeats" }, mode: 'copy'
 
     input:
     tuple val(sample_id), val(genome_label), path(integrations_bed), path(rmsk_bed)

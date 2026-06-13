@@ -7,7 +7,7 @@ nextflow.enable.dsl = 2
 
 process INTEGRATION_ANNOTATE {
     tag "${sample_id}"
-    publishDir "${params.outdir}/04_final_results/${sample_id}/annotations", mode: 'copy'
+    publishDir { "${params.outdir}/04_final_results/${sample_id}/annotations" }, mode: 'copy'
 
     container params.container_R
 
@@ -43,7 +43,7 @@ process INTEGRATION_ANNOTATE {
 
         # 2. BLAST viral genes -----------------------------------------------
         reference_name=\$(head -n1 ${viral_fasta} | cut -f1 -d" " | sed 's/>//g' | rev | cut -f1 -d"." | rev)
-        mkdir -p ${projectDir}/tmp
+        mkdir -p tmp
 
         Rscript ${blast_script} \\
             --prefix ${projectDir} \\
