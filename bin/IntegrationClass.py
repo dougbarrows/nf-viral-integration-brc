@@ -63,34 +63,40 @@ class IntegrationData:
  
       hiv_orient = self.hiv_reads[0].is_reverse
    
-      if hiv_orient:  ## Reverse orientation
+      # PATCH (flank-classification orientation bug): the `for h in self.hiv_reads`
+      # loop below was originally nested inside `if hiv_orient:`, so HIV positions
+      # were marked in seqformat only for reverse (/1) reads. Forward (/0) reads then
+      # never set got_hiv in setFlanksInformation, collapsing all their flanks into
+      # LEFT_FLANK and misrouting every /0 read into "5'-Flanked". The loop is now
+      # de-indented to run for BOTH orientations (matching combine_hiv_V2.py).
+      if hiv_orient:  ## Reverse orientation: flip query coords into forward-read frame
          self.hiv_query_coords = [len(self.seqformat)-self.hiv_query_coords[1], len(self.seqformat)-self.hiv_query_coords[0]]
-         for h in self.hiv_reads:
-            if not h.is_unmapped:
-               hiv_query_coords_tmp = [h.query_alignment_start, h.query_alignment_end]
-               if h.is_reverse:
-                  # Reassign HIV coordinates
-                  hiv_query_coords_tmp = [len(self.seqformat)-hiv_query_coords_tmp[1], len(self.seqformat)-hiv_query_coords_tmp[0]]              
-               if hiv_query_coords_tmp[0] < self.hiv_query_coords[0]:
-                  self.hiv_query_coords[0] = hiv_query_coords_tmp[0]
-               if hiv_query_coords_tmp[1] > self.hiv_query_coords[1]:
-                  self.hiv_query_coords[1] = hiv_query_coords_tmp[1]
-               
-               # Reassign reference coordinates
-               hiv_ref_coords_tmp = [h.reference_start, h.reference_end]
-               if hiv_ref_coords_tmp[0] < self.hiv_ref_coords[0]:
-                  self.hiv_ref_coords[0] = hiv_ref_coords_tmp[0]
-               if hiv_ref_coords_tmp[1] > self.hiv_ref_coords[1]:
-                  self.hiv_ref_coords[1] = hiv_ref_coords_tmp[1]
-               if hiv_orient != h.is_reverse:
-                  self.row_data[RTF.columns.index("HIV_DIR_ERR")] = 1
-               pairs = h.get_aligned_pairs()
-               for p in pairs:
-                   if (p[0]!=None) and (p[1]!=None):
-                      if h.is_reverse:
-                         self.seqformat[len(self.seqformat)-p[0]-1] = 11  ## black bold -- reverse
-                      else:
-                         self.seqformat[p[0]] = 1                    ## black  -- forward
+      for h in self.hiv_reads:
+         if not h.is_unmapped:
+            hiv_query_coords_tmp = [h.query_alignment_start, h.query_alignment_end]
+            if h.is_reverse:
+               # Reassign HIV coordinates
+               hiv_query_coords_tmp = [len(self.seqformat)-hiv_query_coords_tmp[1], len(self.seqformat)-hiv_query_coords_tmp[0]]              
+            if hiv_query_coords_tmp[0] < self.hiv_query_coords[0]:
+               self.hiv_query_coords[0] = hiv_query_coords_tmp[0]
+            if hiv_query_coords_tmp[1] > self.hiv_query_coords[1]:
+               self.hiv_query_coords[1] = hiv_query_coords_tmp[1]
+            
+            # Reassign reference coordinates
+            hiv_ref_coords_tmp = [h.reference_start, h.reference_end]
+            if hiv_ref_coords_tmp[0] < self.hiv_ref_coords[0]:
+               self.hiv_ref_coords[0] = hiv_ref_coords_tmp[0]
+            if hiv_ref_coords_tmp[1] > self.hiv_ref_coords[1]:
+               self.hiv_ref_coords[1] = hiv_ref_coords_tmp[1]
+            if hiv_orient != h.is_reverse:
+               self.row_data[RTF.columns.index("HIV_DIR_ERR")] = 1
+            pairs = h.get_aligned_pairs()
+            for p in pairs:
+                if (p[0]!=None) and (p[1]!=None):
+                   if h.is_reverse:
+                      self.seqformat[len(self.seqformat)-p[0]-1] = 11  ## black bold -- reverse
+                   else:
+                      self.seqformat[p[0]] = 1                    ## black  -- forward
    #-------------------------------------------------------------------------------------------
 
    #-------------------------------------------------------------------------------------------
