@@ -7,7 +7,7 @@ scripts/.ipynb_checkpoints
 .vscode*
 bin/__pycache__/
 
-samplesheets/
+samplesheets/*
 output_test/
 output*/
 results/
