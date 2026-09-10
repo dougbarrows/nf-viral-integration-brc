@@ -7,6 +7,7 @@ scripts/.ipynb_checkpoints
 .vscode*
 bin/__pycache__/
 
+samplesheets/
 output_test/
 output*/
 results/
@@ -31,5 +32,3 @@ report.html
 *.sif
 singularity*
 m8*
-samplesheets/
-samplesheets*/
