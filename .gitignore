@@ -31,3 +31,5 @@ report.html
 *.sif
 singularity*
 m8*
+samplesheets/
+samplesheets*/

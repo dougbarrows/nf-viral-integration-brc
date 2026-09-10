@@ -72,17 +72,17 @@ process INTEGRATION_ANNOTATE {
             ${sample_id_i}.annotated.csv
 
         # Move over intermediates/log files and PNGs to respective folders
-        cp ${params.outdir}/01_reference_selection/${sample_id_i}/*_mapping_comparison.txt .
+        cp ${projectDir}/${params.outdir}/01_reference_selection/${sample_id_i}/*_mapping_comparison.txt .
         mkdir -p logs_intermediates/
-        cp ${params.outdir}/01_reference_selection/${sample_id_i}/*.pbmarkdup.log ./logs_intermediates/
-        cp ${params.outdir}/01_reference_selection/${sample_id_i}/*\${ref_name}*.dups.readnames.txt ./logs_intermediates/
+        cp ${projectDir}/${params.outdir}/01_reference_selection/${sample_id_i}/*.pbmarkdup.log ./logs_intermediates/
+        cp ${projectDir}/${params.outdir}/01_reference_selection/${sample_id_i}/*\${ref_name}*.dups.readnames.txt ./logs_intermediates/
         mv CCS_ReadIDs* logs_intermediates/
         mv *png logs_intermediates/
         mv *combined.csv logs_intermediates/
         mv *viral.txt logs_intermediates/
         mkdir -p blast_output/
         mkdir -p fastas/
-        cp ${params.outdir}/01_reference_selection/${sample_id_i}/*.final.*.fa fastas/
+        cp ${projectDir}/${params.outdir}/01_reference_selection/${sample_id_i}/*.final.*.fa fastas/
 
         # Conditionally copy output files
         if ls *_matches.fa 1> /dev/null 2>&1; then

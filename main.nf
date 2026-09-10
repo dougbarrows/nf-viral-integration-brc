@@ -354,24 +354,28 @@ process MULTI_REFERENCE_MAPPING {
     samtools fastq -@ ${params.threads} ${sample_id_i}_vs_${ref_name}.sorted.bam > \\
         ${sample_id_i}_vs_${ref_name}.fastq
 
+    # Running PBmarkdup
     pbmarkdup ${sample_id_i}_vs_${ref_name}.fastq \\
         ${sample_id_i}_vs_${ref_name}.markdup.fastq \\
         --dup-file ${sample_id_i}_vs_${ref_name}.dups.fastq \\
         --log-level INFO > ${sample_id_i}_vs_${ref_name}.pbmarkdup.log
 
-    grep "@" ${sample_id_i}_vs_${ref_name}.dups.fastq | sed 's/@//g' | cut -f1 -d" " > \\
+    # Get duplicate reads
+    grep "ccs" ${sample_id_i}_vs_${ref_name}.dups.fastq | sed 's/@//g' | cut -f1 -d" " > \\
         ${sample_id_i}_vs_${ref_name}.dups.readnames.txt
+    sed -i 's|/ccs/[0-9]*|/ccs|' ${sample_id_i}_vs_${ref_name}.dups.readnames.txt
 
     # Full-flag SAM (supplementaries intact) for flagstat / inspection.
-    # --qname-file ^${sample_id_i}_vs_${ref_name}.dups.readnames.txt
+    #    --qname-file ^${sample_id_i}_vs_${ref_name}.dups.readnames.txt
     samtools view -h ${sample_id_i}_vs_${ref_name}.sorted.bam \\
         -o ${sample_id_i}_vs_${ref_name}.sorted.sam
 
+    # Get stats
     samtools flagstat ${sample_id_i}_vs_${ref_name}.sorted.sam > \\
         ${sample_id_i}_vs_${ref_name}.stats.txt
 
     # Primary-only SAM for mask.py -> exactly one FASTA record per read.
-    # --qname-file ^${sample_id_i}_vs_${ref_name}.dups.readnames.txt
+    #    --qname-file ^${sample_id_i}_vs_${ref_name}.dups.readnames.txt
     samtools view -h -F 0x900 ${sample_id_i}_vs_${ref_name}.sorted.bam \\
         -o ${sample_id_i}_vs_${ref_name}.primary.sam
 
