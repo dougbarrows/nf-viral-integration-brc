@@ -72,17 +72,38 @@ process INTEGRATION_ANNOTATE {
             ${sample_id_i}.annotated.csv
 
         # Move over intermediates/log files and PNGs to respective folders
-        cp ${projectDir}/${params.outdir}/01_reference_selection/${sample_id_i}/*_mapping_comparison.txt .
+        #
+        # params.outdir is used here without a ${projectDir} prefix. Prefixing only works
+        # when outdir is relative to the pipeline directory (upstream's default is ./output);
+        # with an absolute outdir the two paths concatenate into one that cannot exist, e.g.
+        # "<projectDir>//rugpfs/.../results/Run1/...", and the cp fails after all the real
+        # work has completed. publishDir resolves outdir independently of projectDir, so the
+        # prefix was never what located these files.
+        # Everything below is housekeeping: the analytical outputs (the MasterOfMasterFrame
+        # clone table, *.combined.csv and *.annotated.csv) are already written by this point.
+        # Each optional copy/move is therefore guarded, because under `set -e` a single empty
+        # glob aborts the whole process after ~4 h of compute. The declared outputs are the
+        # DIRECTORIES logs_intermediates/, blast_output/ and fastas/, not the files inside
+        # them, so an empty directory still satisfies Nextflow. The same pattern is used by
+        # the *_matches.fa block below. *_mapping_comparison.txt is deliberately left
+        # unguarded: it is a declared output file, so skipping it would only move the failure
+        # somewhere harder to read.
+        cp ${params.outdir}/01_reference_selection/${sample_id_i}/*_mapping_comparison.txt .
         mkdir -p logs_intermediates/
-        cp ${projectDir}/${params.outdir}/01_reference_selection/${sample_id_i}/*.pbmarkdup.log ./logs_intermediates/
-        cp ${projectDir}/${params.outdir}/01_reference_selection/${sample_id_i}/*\${ref_name}*.dups.readnames.txt ./logs_intermediates/
-        mv CCS_ReadIDs* logs_intermediates/
-        mv *png logs_intermediates/
-        mv *combined.csv logs_intermediates/
-        mv *viral.txt logs_intermediates/
+        cp ${params.outdir}/01_reference_selection/${sample_id_i}/*.pbmarkdup.log ./logs_intermediates/ 2>/dev/null || true
+        # Matched on the suffix rather than on \${ref_name}: that variable is read from the
+        # FASTA header, while these files are named from the FASTA filename. The two agree for
+        # upstream's reference panel (K03455.fasta / ">...K03455") but not for a custom
+        # reference -- HIV_V1_provirus.fa carries the header "Barcode_V1dvpu-SBP-P2A-GFP...",
+        # so the glob matched nothing. Only one viral genome is passed, so this is unambiguous.
+        cp ${params.outdir}/01_reference_selection/${sample_id_i}/*.dups.readnames.txt ./logs_intermediates/ 2>/dev/null || true
+        mv CCS_ReadIDs* logs_intermediates/ 2>/dev/null || true
+        mv *png logs_intermediates/ 2>/dev/null || true
+        mv *combined.csv logs_intermediates/ 2>/dev/null || true
+        mv *viral.txt logs_intermediates/ 2>/dev/null || true
         mkdir -p blast_output/
         mkdir -p fastas/
-        cp ${projectDir}/${params.outdir}/01_reference_selection/${sample_id_i}/*.final.*.fa fastas/
+        cp ${params.outdir}/01_reference_selection/${sample_id_i}/*.final.*.fa fastas/ 2>/dev/null || true
 
         # Conditionally copy output files
         if ls *_matches.fa 1> /dev/null 2>&1; then
