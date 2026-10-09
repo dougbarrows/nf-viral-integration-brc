@@ -339,8 +339,15 @@ process MULTI_REFERENCE_MAPPING {
         ${sample_id_i}_vs_${ref_name}.sorted.sam.fa > \\
         ${sample_id_i}_vs_${ref_name}.viralreads.fa
 
-    # Pass 2: map selected reads to the combined reference
-    minimap2 -t ${params.threads} -m 0 -Y -ax map-hifi --score-N=0 \\
+    # Pass 2: map selected reads to the combined reference.
+    #
+    # -r caps the chaining/alignment bandwidth and the LONG-JOIN bandwidth. The default second
+    # value (20000) exceeds the provirus, so for a host-virus-host read minimap2 bridges both host
+    # flanks into ONE alignment carrying the provirus as a ~5.6 kb insertion. parseSAM_v2.pl counts
+    # host records, so one record means the read is not called dually flanked -- it was instead
+    # labelled "No Flank - Potential Episomal HIV". Keeping the long-join bandwidth below the viral
+    # genome length forces the two flanks to stay separate records.
+    minimap2 -t ${params.threads} -m 0 -Y -ax map-hifi --score-N=0 -r ${params.longjoin_bw} \\
         ${projectDir}/tmp/${ref_name}_hybridhost.fa ${sample_id_i}_viralhits.fastq.gz | \\
         samtools view -h -F 4 -b | \\
         samtools sort -@ ${params.threads} -o ${sample_id_i}_vs_${ref_name}.sorted.bam
