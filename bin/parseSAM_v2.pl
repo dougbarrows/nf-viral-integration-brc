@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 use strict;
+use POSIX ();
 
 ################################
 ## Authors: Eric C. Rouchka   ##
@@ -105,7 +106,8 @@ my %HIV_SEQ_HASH;
 
 my $currBAM = $HIVparsedSAM_FN; 
 my @clonePos;
-if(!(-e $currBAM)) { 
+my %cloneBucket;
+if(!(-e $currBAM)) {
    print "SKIPPING $currBAM (does not exist)\n";
 }
 else {
@@ -276,10 +278,11 @@ else {
             }
          }
          ## Set Everything
-         my $cloneNum = getCloneID(\@clonePos, $currIntegrationSite);
+         my $cloneNum = getCloneID(\@clonePos, \%cloneBucket, $currIntegrationSite);
          if($cloneNum == -1) {
             my $numClones = @clonePos;
             push(@clonePos, $currIntegrationSite);
+            push(@{$cloneBucket{posBucket($currIntegrationSite, $MAX_INTEGRATION_DIFF)}}, $numClones);
             $cloneNum = $numClones + 1;
          }
          my $currCloneNum = $currChrNum .  "_" . $cloneNum; 
@@ -311,59 +314,35 @@ else {
             }
          }
       }
-      my @ccsK = sort {$CLONE_HASH{$a} cmp $CLONE_HASH{$b}} keys(%CLONE_HASH);
-      my $numCCSK = @ccsK;
-      for(my $c = 0; $c < $numCCSK; $c++) { 
-         #my $currCCSID = $ccsIDs[$c]; 
-         my $currCCSID = $ccsK[$c]; 
-         my $currFlankDesc = $FLANK_HASH{$currCCSID};
-         my $currPos = $POS_HASH{$currCCSID};
-         my $currIntegration = $INTEGRATION_HASH{$currCCSID};
-         my $currShear = $SHEAR_HASH{$currCCSID};
-         my $currClone = $CLONE_HASH{$currCCSID};
-         my $currHIVLen = $HIV_LEN_HASH{$currCCSID};
-         my $pcrClones = $CLONE_PCR_HASH{$currClone};
-         my $currHIVPos = $HIV_POS_HASH{$currCCSID};
-         my $currPCRClone = -1;
+   }
 
-         if(defined($pcrClones)) { 
-            my @wds22 = split(/$SEPARATOR/, $pcrClones);
-            my $numWds22 = @wds22;
-            for(my $p = 0; $p < $numWds22; $p++) { 
-               my($pcrID, $hivLen, $shearPos)  = split(/\|/, $wds22[$p]);
-   
-               my $hivDIFF = $currHIVLen - $hivLen;
-               my @shear1Wds = split(/$SEPARATOR2/, $currShear);
-               my @shear2Wds = split(/$SEPARATOR2/, $shearPos);
-               my $numShear1 = @shear1Wds;
-               my $numShear2 = @shear2Wds;
-               if($numShear1 == $numShear2) { ## Both are Dually flanked
-                  my $shearOK = 1;
-                  for(my $s = 0; $s < $numShear1; $s++) { 
-                     my $shearDIFF = $shear1Wds[$s] - $shear2Wds[$s];
-                     if($shearDIFF < 0) { $shearDIFF *= -1; }
-                     if($shearDIFF > $MAX_SHEAR_DIFF) { 
-                        $shearOK = 0;
-                     }
-                  }
-                  if($hivDIFF < 0) { $hivDIFF *= -1; }
-                  if(($hivDIFF <= $MAX_HIV_DIFF) && ($shearOK)) { 
-                     $currPCRClone = $pcrID;
-                  }
-               }
-            }
-            if($currPCRClone eq "-1") {
-               my $numPCR = $numWds22 + 1;
-               $currPCRClone = $currClone . "_" . $numPCR;
-               $CLONE_PCR_HASH{$currClone} .= $SEPARATOR . $currPCRClone . "|" . $currHIVLen . "|" . $currShear;
-            } 
-         }
-         else {
-            $currPCRClone = $currClone . "_1";
-            $CLONE_PCR_HASH{$currClone} = $currPCRClone . "|" . $currHIVLen . "|" . $currShear;
-         }
-         $PCR_HASH{$currCCSID} = $currPCRClone;
+   ##################################################################
+   ## Assign PCR clones.  This used to run inside the per-read loop ##
+   ## above, re-sorting and re-matching every read seen so far for  ##
+   ## each new read (n^2).  In that version only the newly added    ##
+   ## read could create a PCR group, so groups were created in      ##
+   ## sorted read-ID order, and the final iteration gave every read ##
+   ## the LAST matching group in the finished list.  These two      ##
+   ## passes reproduce exactly that result.                         ##
+   ##################################################################
+   foreach my $currCCSID (@ccsIDs) {
+      my $currClone = $CLONE_HASH{$currCCSID};
+      next if(!defined($currClone));
+      my $currShear = $SHEAR_HASH{$currCCSID};
+      my $currHIVLen = $HIV_LEN_HASH{$currCCSID};
+      my $pcrClones = $CLONE_PCR_HASH{$currClone};
+      if(!defined($pcrClones)) {
+         $CLONE_PCR_HASH{$currClone} = $currClone . "_1" . "|" . $currHIVLen . "|" . $currShear;
       }
+      elsif(matchPCRClone($pcrClones, $currShear, $currHIVLen) eq "-1") {
+         my @wds22 = split(/$SEPARATOR/, $pcrClones);
+         my $numPCR = @wds22 + 1;
+         $CLONE_PCR_HASH{$currClone} .= $SEPARATOR . $currClone . "_" . $numPCR . "|" . $currHIVLen . "|" . $currShear;
+      }
+   }
+   foreach my $currCCSID (keys(%CLONE_HASH)) {
+      my $currClone = $CLONE_HASH{$currCCSID};
+      $PCR_HASH{$currCCSID} = matchPCRClone($CLONE_PCR_HASH{$currClone}, $SHEAR_HASH{$currCCSID}, $HIV_LEN_HASH{$currCCSID});
    }
    printHostHits(\%PCR_HASH, \%CLONE_HASH, \%FLANK_HASH, \%POS_HASH, \%INTEGRATION_HASH, \%SHEAR_HASH, \%HIV_LEN_HASH, \%HIV_POS_HASH, \%OVERLAP_SEQ_HASH, \%HIV_SEQ_HASH, $OUTFILE);
 }
@@ -539,6 +518,7 @@ sub processNoHostReads {
    ####################################
    my $numGood = @goodCCS;
    my @HIV_Clones;
+   my %HIV_CloneBucket;
    my %cloneHASH;
 
    for(my $i = 0; $i < $numGood; $i++) { 
@@ -551,7 +531,20 @@ sub processNoHostReads {
 
       my $numClones = @HIV_Clones;
       my $clonePos = -1;
-      for(my $j = 0; $j < $numClones; $j++) {
+      ##################################################################
+      ## A match needs the same number of hits and every position     ##
+      ## within MAX_HIV_POS_DIFF, so only clones keyed by hit count    ##
+      ## and a neighbouring bucket of the first position can match.   ##
+      ##################################################################
+      my $posBkt = posBucket($currPosARR[0], $MAX_HIV_POS_DIFF);
+      my @candidates;
+      for my $nb ($posBkt - 1, $posBkt, $posBkt + 1) {
+         my $bKey = $currNumHits . ":" . $nb;
+         if(defined($HIV_CloneBucket{$bKey})) {
+            push(@candidates, @{$HIV_CloneBucket{$bKey}});
+         }
+      }
+      foreach my $j (@candidates) {
          my $currCloneInfo = $HIV_Clones[$j];
          my($cloneLenInfo, $clonePosInfo) = split(/\|/, $currCloneInfo);
          my @cloneLenARR = split(/$SEPARATOR2/, $cloneLenInfo);
@@ -573,13 +566,14 @@ sub processNoHostReads {
                   $maxPosDiff = $currPosDiff;
                }
             }
-            if(($maxLenDiff <= $MAX_HIV_DIFF) && ($maxPosDiff <= $MAX_HIV_POS_DIFF)) { 
+            if(($maxLenDiff <= $MAX_HIV_DIFF) && ($maxPosDiff <= $MAX_HIV_POS_DIFF) && ($j > $clonePos)) {
                $clonePos = $j;
-            }   
-         }            
+            }
+         }
       }
       if($clonePos == -1) {
          push(@HIV_Clones, $currLenInfo . "|" . $currPosInfo);
+         push(@{$HIV_CloneBucket{$currNumHits . ":" . $posBkt}}, $numClones);
          $clonePos = $numClones;
       }
       $clonePos++;
@@ -679,33 +673,37 @@ sub updateHash {
    my($hREF, $lab, $ccs, $l, $errFH, $warnFH) = @_;
 
    my $SAM_chr = "TEST";
-   my %h = %$hREF;
-   if(defined($h{$ccs})) { 
-      if($lab eq "HIV") { 
+   ##################################################################
+   ## Update the caller's hash through the reference.  Copying it  ##
+   ## in (my %h = %$hREF) and back out (return %h) cost the full   ##
+   ## size of the hash on every SAM record, so parsing scaled as   ##
+   ## n^2 and samples with ~1M HIV-hitting reads never finished.   ##
+   ##################################################################
+   if(defined($hREF->{$ccs})) {
+      if($lab eq "HIV") {
          my @wds1 = split(/\t/, $l);
-         my @wds2 = split(/\t/, $h{$ccs});
+         my @wds2 = split(/\t/, $hREF->{$ccs});
          my $len1 = length($wds1[9]);
          my $len2 = length($wds2[9]);
-         if(($len1 > $len2) && ($len2 < 300)) { 
-           $h{$ccs} = $l;
+         if(($len1 > $len2) && ($len2 < 300)) {
+           $hREF->{$ccs} = $l;
          }
          else {
             if(($len1 > 300) && ($len2 > 300)) {
                if(!($SAM_chr eq "NF")) { 
                   print $warnFH "POTENTIAL REARRANGEMENT: Two separate long HIV entries for $ccs: $len1 and $len2\n";
                }
-               $h{$ccs} .= $SEPARATOR . $l;
+               $hREF->{$ccs} .= $SEPARATOR . $l;
             }
-         }            
+         }
       }
       else {
-         $h{$ccs} .= $SEPARATOR . $l;
+         $hREF->{$ccs} .= $SEPARATOR . $l;
       }
    }
    else {
-      $h{$ccs} = $l;
+      $hREF->{$ccs} = $l;
    }
-   return(%h);
 }
 #-----------------------------------------------------------------------
 
@@ -745,10 +743,10 @@ sub parseSAMFile {
          $ccsHash{$CCS_ID} = $CCS_ID;
 
          if($chr eq $HIV_CHR_NAME) { 
-            %hHash = updateHash(\%hHash, "HIV", $CCS_ID, $line, $EFH, $WFH);
+            updateHash(\%hHash, "HIV", $CCS_ID, $line, $EFH, $WFH);
          }
          else {
-            %cHash = updateHash(\%cHash, "--CHR--", $CCS_ID, $line, $EFH, $WFH);
+            updateHash(\%cHash, "--CHR--", $CCS_ID, $line, $EFH, $WFH);
          }
       }
    }
@@ -777,22 +775,72 @@ sub findMatchInsDel {
 #-----------------------------------------------------------------------
 #-----------------------------------------------------------------------
 sub getCloneID {
-   my($cPosREF, $intSite) = @_;
- 
-   my @cPos = @$cPosREF; 
-   my $cNum = -1;
-   my $numClones = @cPos;
+   my($cPosREF, $bucketREF, $intSite) = @_;
 
-   for(my $cl = 0; $cl < $numClones; $cl++) {
-      my $currDiff = $cPos[$cl] - $intSite;
-      if($currDiff < 0) { 
-         $currDiff *= -1;
-      }
-      if($currDiff <= $MAX_INTEGRATION_DIFF) { 
-         $cNum = $cl + 1;
+   ##################################################################
+   ## Only clones in the same or a neighbouring position bucket can ##
+   ## lie within MAX_INTEGRATION_DIFF, so check those rather than   ##
+   ## scanning (and copying) every clone for every read.  The old   ##
+   ## scan kept the LAST matching clone, so keep the highest index. ##
+   ##################################################################
+   my $cNum = -1;
+   my $bkt = posBucket($intSite, $MAX_INTEGRATION_DIFF);
+   for my $nb ($bkt - 1, $bkt, $bkt + 1) {
+      next if(!defined($bucketREF->{$nb}));
+      foreach my $cl (@{$bucketREF->{$nb}}) {
+         my $currDiff = $cPosREF->[$cl] - $intSite;
+         if($currDiff < 0) {
+            $currDiff *= -1;
+         }
+         if(($currDiff <= $MAX_INTEGRATION_DIFF) && ($cl + 1 > $cNum)) {
+            $cNum = $cl + 1;
+         }
       }
    }
    return($cNum);
+}
+#-----------------------------------------------------------------------
+
+#-----------------------------------------------------------------------
+sub matchPCRClone {
+   my($pcrClones, $currShear, $currHIVLen) = @_;
+
+   my $currPCRClone = -1;
+   my @wds22 = split(/$SEPARATOR/, $pcrClones);
+   my $numWds22 = @wds22;
+   for(my $p = 0; $p < $numWds22; $p++) {
+      my($pcrID, $hivLen, $shearPos)  = split(/\|/, $wds22[$p]);
+
+      my $hivDIFF = $currHIVLen - $hivLen;
+      my @shear1Wds = split(/$SEPARATOR2/, $currShear);
+      my @shear2Wds = split(/$SEPARATOR2/, $shearPos);
+      my $numShear1 = @shear1Wds;
+      my $numShear2 = @shear2Wds;
+      if($numShear1 == $numShear2) { ## Both are Dually flanked
+         my $shearOK = 1;
+         for(my $s = 0; $s < $numShear1; $s++) {
+            my $shearDIFF = $shear1Wds[$s] - $shear2Wds[$s];
+            if($shearDIFF < 0) { $shearDIFF *= -1; }
+            if($shearDIFF > $MAX_SHEAR_DIFF) {
+               $shearOK = 0;
+            }
+         }
+         if($hivDIFF < 0) { $hivDIFF *= -1; }
+         if(($hivDIFF <= $MAX_HIV_DIFF) && ($shearOK)) {
+            $currPCRClone = $pcrID;
+         }
+      }
+   }
+   return($currPCRClone);
+}
+#-----------------------------------------------------------------------
+
+#-----------------------------------------------------------------------
+sub posBucket {
+   my($pos, $width) = @_;
+
+   if($width < 1) { $width = 1; }
+   return(POSIX::floor($pos / $width));
 }
 #-----------------------------------------------------------------------
 
