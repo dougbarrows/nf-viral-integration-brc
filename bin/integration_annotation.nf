@@ -44,9 +44,20 @@ process INTEGRATION_ANNOTATE {
         # 1. BLAST viral genes -----------------------------------------------
         mkdir -p ${projectDir}/tmp
 
+        # BLAST only the reads that reached the clone table. unmasked_fa is built from pass 1
+        # (viral reference alone), which also catches reads whose "HIV" match is host sequence
+        # and vanishes once the host genome competes in pass 2 -- ~80% of reads in some samples.
+        # The merge below is an inner join on READ, so those reads were discarded anyway, and
+        # the BLAST script runs blastn once per read (~0.3 s each), so they only cost time.
+        tail -n +2 ${sample_id_i}_MasterOfMasterFrame.tsv | cut -f1 | sort -u > tmp_clone_reads.txt
+        awk 'NR==FNR {keep[\$1]; next}
+             /^>/ {id = substr(\$1, 2); sub("/ccs/[0-9]+\$", "/ccs", id); p = (id in keep)}
+             p' tmp_clone_reads.txt ${unmasked_fa} > tmp_blast_input.fa
+        echo "BLAST input: \$(grep -c '>' tmp_blast_input.fa) of \$(grep -c '>' ${unmasked_fa}) reads"
+
         perl ${blast_script} \\
             --prefix ${projectDir} \\
-            --in ${unmasked_fa} \\
+            --in tmp_blast_input.fa \\
             --virus HIV \\
             --reference \${reference_name}* \\
             --out ${sample_id_i}.viral.txt
